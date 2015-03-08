@@ -8,6 +8,8 @@
  * Also, given a large CBOR file as input, this utility converts the large CBOR file into multiple
  * HTML output files grouped as described in the above scheme.
  * 
+ * To use, run the .jar file with the following four arguments.
+ *
  * Takes three arguements : 
  * 1) Path to CBOR File
  * 2) input Directory of HTML Pages
