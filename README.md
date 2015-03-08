@@ -15,7 +15,7 @@
  * 2) input Directory of HTML Pages
  * 3) output Directory of HTML Pages
  * 4) mode : t when writing a large cbor file
- * 			 f when reading from a large cbor File
+ * 			       f when reading from a large cbor File
  * 
  * 2 should be null when converting from a CBOR file and 3 should be null when converting to a large CBOR file. 
  * 
