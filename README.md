@@ -10,7 +10,6 @@
  * 
  * To use, run the .jar file with the following four arguments.
  *
- * Takes three arguements : 
  * 1) Path to CBOR File
  * 2) input Directory of HTML Pages
  * 3) output Directory of HTML Pages
