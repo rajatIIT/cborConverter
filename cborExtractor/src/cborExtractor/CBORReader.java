@@ -3,8 +3,10 @@ package cborExtractor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -13,10 +15,13 @@ import java.util.Iterator;
 import org.json.JSONObject;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
+import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.cbor.CBORParser;
 
 /**
@@ -28,7 +33,25 @@ import com.fasterxml.jackson.dataformat.cbor.CBORParser;
  */
 public class CBORReader {
 	
+	String currentFile;
+	private CBORFactory myFactory;
+	private FileInputStream fis;
+	private ObjectMapper mapper;
+	private CBORParser myCborParser;
+	private JsonFactory myJsonFactory;
+	private String cborOutputDirectory,cborFilePath;
+	private int objectOpen=0;
+	private JsonToken currentToken;
+	private JsonGenerator myJsonGenerator;
+	private boolean responseFlag;
+	private ObjectMapper cborMapper;
+	private FileOutputStream cborOutputStream;
+	
+	
+	
 	public CBORReader() throws IOException{
+	
+		
 		
 	}
 	
@@ -37,59 +60,136 @@ public class CBORReader {
 	public void singleCBORtoMultipleHTML(String cborFilePath, String outputDirectory) throws IOException{
 		
 		// read the CBOR File sequentially
-		CBORFactory myFactory = new CBORFactory();
-		FileInputStream fis = new FileInputStream(cborFilePath);
-		ObjectMapper mapper = new ObjectMapper(myFactory);
+		this.cborFilePath = cborFilePath ;
+		this.cborOutputDirectory = outputDirectory ;
+				
+		JsonFactory myJsonFactor = new JsonFactory();
 		
-		CBORParser myCborParser = myFactory.createParser(fis);
-		// read the whole stored data as a JsonNode
-		JsonNode documentNode = mapper.readValue(myCborParser, JsonNode.class);
+		(new File(cborOutputDirectory + File.separator + "allFields")).mkdir();
 		
+		initializeInputFile();
 		
-		JsonNode objectNode = documentNode.get("Objects");
-		Iterator<JsonNode> documentIterator = objectNode.elements();
+		initializeOutputFile();
 		
-		
-		
-		String allFieldsPath =  outputDirectory + "allFields";
-		(new File(allFieldsPath)).mkdir();
-		String onlySourcePath = outputDirectory + "source";
-		(new File(onlySourcePath)).mkdir();
-		
-		while(documentIterator.hasNext())
-		{
-			JsonNode nextdocument = documentIterator.next();
-			URL urlForThis = new URL(URLDecoder.decode(nextdocument.get("url").textValue()));
-			System.out.println("Writing " + nextdocument.get("url").textValue());
+		while(objectOpen!=0){
 			
-			JsonNode currentResponse = nextdocument.get("response");
-			JsonNode currentContent = currentResponse.get("body");
+			// write  a general code for every next token
+			if (currentToken.equals(JsonToken.START_OBJECT))
+			{
+				if (objectOpen==1)
+					 {
+					
+					//do not write anything because we will be writing this in the next step of URL
+					
+					 } else {
+						 myJsonGenerator.writeStartObject();
+					}
+				objectOpen++;
+				advanceToken();
+			} else if (currentToken.equals(JsonToken.FIELD_NAME)){
 			
+				if(myCborParser.getText().equals("response"))
+				{	responseFlag=true;
 			
+				}
+				
+				// if filed name is URL, we create a new file
+				// also if fieldName is body and responseFlag is set write to the sources file
+			if (myCborParser.getText().equals("url") && objectOpen==2){
+				
+				advanceToken();
+				String currentCBORURL = myCborParser.getValueAsString();
+				System.out.println("Processing " + currentCBORURL);
+				refreshFile(currentCBORURL);
+				myJsonGenerator.writeStartObject();
+				myJsonGenerator.writeStringField("url",currentCBORURL);
+				advanceToken();
+			} else {
+				myJsonGenerator.writeFieldName(myCborParser.getText());
+				advanceToken();
+			} 
+			} else if (currentToken.equals(JsonToken.END_OBJECT)){
+				
+				 if (objectOpen==2) {
+					 // close the generator too here
+					 myJsonGenerator.writeEndObject();
+					 myJsonGenerator.close();
+				 } else if (objectOpen==1 || objectOpen==0){	 
+				 }else {
+					 // simply write an end object
+					 myJsonGenerator.writeEndObject();
+				 }
+				 advanceToken();
+				 objectOpen--;
+			} else if (currentToken.equals(JsonToken.VALUE_STRING)) {
+				
+				myJsonGenerator.writeString((myCborParser.getText()));
+				advanceToken();
+			}  else if (currentToken.equals(JsonToken.VALUE_NUMBER_INT)) {
 			
-			// we got the Document. Now write the data output and the source output
-			String URLHost = urlForThis.getHost();
-			
-			if(!(new File(allFieldsPath + File.separator + URLHost)).exists())
-				(new File(allFieldsPath + File.separator + URLHost)).mkdir();
-			
-			if(!(new File(onlySourcePath + File.separator + URLHost)).exists())
-				(new File(onlySourcePath + File.separator + URLHost)).mkdir();
-			
-			
-			File allFieldsFile = new File(allFieldsPath + File.separator + URLHost + File.separator + URLEncoder.encode(urlForThis.toString()));
-			JSONObject documentObject = new JSONObject(nextdocument.toString());
-			
-			PrintWriter myWriter = new PrintWriter(allFieldsFile);
-			myWriter.write(documentObject.toString());
-			myWriter.close();
-			
-			File onlySourceFile = new File(onlySourcePath + File.separator + URLHost + File.separator + URLEncoder.encode(urlForThis.toString()));
-			myWriter = new PrintWriter(onlySourceFile);
-			myWriter.write(currentContent.toString());
-			myWriter.close();
+				myJsonGenerator.writeNumber(myCborParser.getText());
+				advanceToken();
+			} else if (currentToken.equals(JsonToken.VALUE_NULL)) {
+				
+				myJsonGenerator.writeNull();
+				advanceToken();
+			} else {
+				advanceToken();
+			}
 		}
+			myCborParser.close();
+	}
+		
+	private void refreshFile(String valueAsString) throws IOException {
+		// TODO Auto-generated method stub
+
+		URL fileURL = new URL(URLDecoder.decode(valueAsString));
+		
+		File currentDirectoryPath = new File(cborOutputDirectory + File.separator + "allFields" + File.separator + fileURL.getHost());
+		if(!(currentDirectoryPath).exists())
+			currentDirectoryPath.mkdir();
+		
+		
+		
+		File currentAllSourceFile = new File(cborOutputDirectory + File.separator + "allFields" + File.separator + fileURL.getHost() + File.separator +  valueAsString);
+		
+		if(!currentAllSourceFile.exists())
+			currentAllSourceFile.createNewFile();
+		
+		
+		
+		FileOutputStream myFOS = new FileOutputStream(currentAllSourceFile);
+		myJsonGenerator = myJsonFactory.createGenerator(myFOS);
+		myJsonGenerator.useDefaultPrettyPrinter();
+		// Now the generator is ready for writing
+		
 		
 	}
 
+
+	private void initializeOutputFile() throws IOException {
+		myJsonFactory = new JsonFactory();
+		// cbor parser at start object
+		advanceToken();
+		objectOpen++;
+		// cbor parser at name objects
+		advanceToken();
+		// cbor parser at start array
+		advanceToken();
+		//cbor parser at start object for a new file 
+		advanceToken();
+	}
+
+	private void advanceToken() throws IOException {
+	//	System.out.println("Passing token: " + myCborParser.getText());
+		currentToken = myCborParser.nextToken();
+	}
+
+	private void initializeInputFile() throws IOException {
+		myFactory = new CBORFactory();
+		fis = new FileInputStream(cborFilePath);
+		mapper = new ObjectMapper(myFactory);
+		myCborParser = myFactory.createParser(fis);
 }
+}
+

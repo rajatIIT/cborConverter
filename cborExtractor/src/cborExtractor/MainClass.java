@@ -33,26 +33,28 @@ public class MainClass {
 	private static String outputDirectory;
 	private static String inputDirectory;
 	private static String mode;
+	private static String userName;
+	private static String userEmail; 
+	
 	
 	public static void main(String[] args) throws IOException{
 		
-		//cborFilePath = "/home/vaio/Documents/Development/data/cborout/cboroutput";
-		//inputDirectory = "/home/vaio/Documents/Development/data/sample";
-		//outputDirectory = "/home/vaio/Documents/Development/data/convertedData";
-		//mode="f";
 		
 		cborFilePath = args[0];
 		inputDirectory = args[1];
 		outputDirectory = args[2];
 		mode=args[3];
+		userName = args[4];
+		userEmail = args[5];
+		
+		
 		
 		if(mode.equals("t")){
-			CBORWriter myWriter = new CBORWriter();
+			CBORWriter myWriter = new CBORWriter(userName,userEmail);
 			myWriter.multipleHTMLToSingleCBOR(inputDirectory, cborFilePath); 
 			} else if (mode.equals("f")) {
 			CBORReader myReader = new CBORReader();
 			myReader.singleCBORtoMultipleHTML(cborFilePath, outputDirectory);
 			}
-		
 	}
 }

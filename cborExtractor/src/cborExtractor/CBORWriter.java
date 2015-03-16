@@ -31,9 +31,11 @@ public class CBORWriter {
 	private ObjectMapper mapper;
 	
 	
-	public CBORWriter(){
+	public CBORWriter(String userName, String userEmail){
 		myCborFactory = new CBORFactory();
 		mapper = new ObjectMapper(myCborFactory);
+		suppliedContactName = userName;
+		suppliedContantEmail = userEmail;
 	}
 	
 	public void multipleHTMLToSingleCBOR(String htmlPath, String cborOutputPath) throws IOException{
